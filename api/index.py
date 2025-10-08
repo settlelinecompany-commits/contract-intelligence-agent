@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Contract Intelligence Agent - Vercel Serverless Version
+Contract Intelligence Agent - Standalone Vercel Serverless Version
 AI-powered contract analysis with OCR and automated event generation
 """
 
@@ -8,15 +8,11 @@ import os
 import sys
 import json
 import tempfile
+import requests
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
-
-# Add src to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-from colab_client import ColabOCRClient
-from src.parser.contract_intelligence import ContractIntelligence
+from openai import OpenAI
 from fastapi import FastAPI, File, UploadFile, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,6 +39,377 @@ app.add_middleware(
 # Configuration
 COLAB_URL = os.getenv('COLAB_OCR_URL', 'https://snaillike-russel-snodly.ngrok-free.dev')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+# Initialize OpenAI client
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+class ColabOCRClient:
+    """Client for Colab OCR API"""
+    
+    def __init__(self, colab_url: str):
+        self.colab_url = colab_url.rstrip('/')
+    
+    async def health_check(self) -> str:
+        """Check if Colab OCR API is healthy"""
+        try:
+            response = requests.get(f"{self.colab_url}/health", timeout=10)
+            if response.status_code == 200:
+                return "✅ Colab API is healthy"
+            else:
+                return f"❌ Colab API returned {response.status_code}"
+        except Exception as e:
+            return f"❌ Colab API error: {str(e)}"
+    
+    def process_contract(self, file_path: str) -> dict:
+        """Process contract file with Colab OCR"""
+        try:
+            print(f"🚀 Sending {os.path.basename(file_path)} to Colab OCR API...")
+            
+            with open(file_path, 'rb') as f:
+                files = {'file': f}
+                response = requests.post(f"{self.colab_url}/ocr", files=files, timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ Colab OCR completed: {len(result.get('text', ''))} characters")
+                return result
+            else:
+                print(f"❌ Colab OCR failed: {response.status_code}")
+                return {"text": "", "error": f"HTTP {response.status_code}"}
+                
+        except Exception as e:
+            print(f"❌ Colab OCR error: {str(e)}")
+            return {"text": "", "error": str(e)}
+
+class ContractIntelligence:
+    """AI-powered contract analysis"""
+    
+    def __init__(self, openai_api_key: str):
+        self.openai_client = OpenAI(api_key=openai_api_key) if openai_api_key else None
+        self.model = "gpt-4o-mini"
+    
+    def parse_contract(self, raw_text: str) -> dict:
+        """Parse contract text using OpenAI API"""
+        
+        if not self.openai_client:
+            return self._fallback_parsing(raw_text)
+        
+        print("🧠 Using OpenAI API for comprehensive contract analysis...")
+        
+        try:
+            # Create a comprehensive prompt for contract parsing
+            prompt = f"""
+            You are an expert contract analyst specializing in Dubai rental agreements. 
+            Analyze the following contract text and provide a comprehensive analysis in JSON format.
+
+            Contract Text:
+            {raw_text}
+
+            Return ONLY a valid JSON object with the following structure:
+            {{
+                "contract_data": {{
+                    "property": {{
+                        "building": "Building name",
+                        "unit": "Unit number", 
+                        "location": "Full location",
+                        "size_sqm": 85.42,
+                        "type": "Property type"
+                    }},
+                    "parties": {{
+                        "landlord": {{
+                            "name": "Landlord name",
+                            "passport_no": "Passport number",
+                            "phone_primary": "Primary phone",
+                            "phone_alt": "Alternative phone",
+                            "email": "Email address"
+                        }},
+                        "tenant": {{
+                            "name": "Tenant name",
+                            "passport_no": "Passport number", 
+                            "phone_primary": "Primary phone",
+                            "phone_alt": "Alternative phone",
+                            "email": "Email address"
+                        }}
+                    }},
+                    "lease": {{
+                        "start_date": "2021-07-20",
+                        "end_date": "2022-07-19",
+                        "duration_months": 12,
+                        "notice_period_days": 30
+                    }},
+                    "rent": {{
+                        "annual_aed": 48000.00,
+                        "monthly_aed": 4000.00,
+                        "cheques": {{
+                            "count": 4,
+                            "amount_per_cheque": 12000.00,
+                            "dates": ["2021-07-20", "2021-10-20", "2022-01-20", "2022-04-20"]
+                        }}
+                    }},
+                    "deposit": {{
+                        "refundable_aed": 4000.00,
+                        "security_deposit": 4000.00
+                    }},
+                    "furnishing": {{
+                        "status": "Fully furnished",
+                        "inventory_present": true
+                    }},
+                    "responsibilities": {{
+                        "service_charges": "Landlord",
+                        "dewa": "Tenant", 
+                        "chiller": "Tenant",
+                        "ejari_registration": "Tenant",
+                        "maintenance_major": "Landlord",
+                        "maintenance_minor": "Tenant",
+                        "maintenance_minor_cap": 500.00
+                    }},
+                    "terms": {{
+                        "pets_allowed": false,
+                        "subletting_allowed": false,
+                        "early_termination_penalty": "2 months rent + AED 1,000",
+                        "renewal_notice_days": 90,
+                        "governing_law": "Dubai laws"
+                    }},
+                    "identifiers": {{
+                        "ejari_number": "Ejari registration number",
+                        "dewa_premise_no": "DEWA premise number",
+                        "plot_no": "Plot number"
+                    }}
+                }},
+                "rental_events": [
+                    {{
+                        "event_type": "payment_due",
+                        "title": "Rent Payment Due",
+                        "date": "2021-10-20",
+                        "description": "Second rent payment of AED 12,000 due",
+                        "automated_actions": [
+                            "📅 Add to Calendar",
+                            "💬 Send WhatsApp Reminder",
+                            "📧 Send Email Reminder"
+                        ]
+                    }},
+                    {{
+                        "event_type": "renewal_window_start",
+                        "title": "Renewal Window Opens",
+                        "date": "2022-04-20",
+                        "description": "90-day renewal notice period begins",
+                        "automated_actions": [
+                            "📅 Add to Calendar",
+                            "💬 Send WhatsApp Reminder",
+                            "📧 Send Email Reminder"
+                        ]
+                    }}
+                ],
+                "completeness_analysis": {{
+                    "completeness_score": 85,
+                    "quality_status": "good",
+                    "missing_critical": [
+                        "ejari_number",
+                        "cheque_dates",
+                        "tenant_phone"
+                    ],
+                    "missing_important": [
+                        "inventory_list",
+                        "landlord_email",
+                        "maintenance_cap"
+                    ],
+                    "needs_confirmation": [
+                        "service_charges_responsibility",
+                        "chiller_responsibility"
+                    ],
+                    "actionable_gaps": [
+                        {{
+                            "type": "missing_document",
+                            "field": "ejari_number",
+                            "label": "Ejari Registration Number",
+                            "description": "Ejari number not found in contract text",
+                            "priority": "high",
+                            "status": "missing",
+                            "automated_action": "📄 Upload Ejari Certificate"
+                        }},
+                        {{
+                            "type": "missing_contact",
+                            "field": "tenant_phone",
+                            "label": "Tenant Phone Number",
+                            "description": "Tenant contact number not found",
+                            "priority": "medium", 
+                            "status": "missing",
+                            "automated_action": "📱 Add Tenant Contact"
+                        }}
+                    ],
+                    "validation_notes": [
+                        "Contract appears to be a standard Dubai tenancy agreement",
+                        "Most key terms are present and clearly defined",
+                        "Some contact information and document references are missing"
+                    ]
+                }}
+            }}
+
+            IMPORTANT INSTRUCTIONS:
+            1. Extract ONLY information explicitly stated in the contract text
+            2. Do NOT make assumptions or add information not present
+            3. If information is not found, use null or empty string
+            4. Format dates as YYYY-MM-DD
+            5. Format currency amounts as numbers (e.g., 48000.00)
+            6. Return ONLY the JSON object, no additional text
+            7. Ensure the JSON is valid and properly formatted
+            """
+
+            # Call OpenAI API
+            response = self.openai_client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are an expert contract analyst. Return only valid JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=3000,
+                temperature=0.1
+            )
+            
+            ai_response = response.choices[0].message.content.strip()
+            print(f"🤖 OpenAI Response: {ai_response[:100]}...")
+            
+            # Clean up response (remove markdown code blocks if present)
+            if ai_response.startswith("```json"):
+                ai_response = ai_response[7:]
+            if ai_response.endswith("```"):
+                ai_response = ai_response[:-3]
+            ai_response = ai_response.strip()
+            
+            # Parse JSON response
+            try:
+                analysis_result = json.loads(ai_response)
+                
+                # Extract contract data and add metadata
+                contract_data = analysis_result.get("contract_data", {})
+                contract_data["parsed_at"] = datetime.now().isoformat()
+                contract_data["ai_model"] = self.model
+                contract_data["confidence"] = "high"
+                
+                # Add events and completeness analysis to the result
+                contract_data["rental_events"] = analysis_result.get("rental_events", [])
+                contract_data["completeness_analysis"] = analysis_result.get("completeness_analysis", {})
+                
+                print("✅ Comprehensive contract analysis completed with OpenAI API")
+                return contract_data
+                
+            except json.JSONDecodeError as e:
+                print(f"⚠️ JSON parsing failed, falling back to rule-based extraction: {e}")
+                return self._fallback_parsing(raw_text)
+                
+        except Exception as e:
+            print(f"❌ OpenAI API error: {e}")
+            print("🔄 Falling back to rule-based parsing...")
+            return self._fallback_parsing(raw_text)
+    
+    def _fallback_parsing(self, raw_text: str) -> dict:
+        """Fallback rule-based parsing when OpenAI API fails"""
+        print("🧠 Using rule-based parsing (fallback mode)")
+        
+        try:
+            # Extract data using simple rules
+            contract_data = {
+                "property": {
+                    "building": None,
+                    "unit": None,
+                    "location": None,
+                    "size_sqm": None,
+                    "type": "Residential"
+                },
+                "parties": {
+                    "landlord": {
+                        "name": None,
+                        "passport_no": None,
+                        "phone_primary": None,
+                        "phone_alt": None,
+                        "email": None
+                    },
+                    "tenant": {
+                        "name": None,
+                        "passport_no": None,
+                        "phone_primary": None,
+                        "phone_alt": None,
+                        "email": None
+                    }
+                },
+                "lease": {
+                    "start_date": None,
+                    "end_date": None,
+                    "duration_months": None,
+                    "notice_period_days": None
+                },
+                "rent": {
+                    "annual_aed": None,
+                    "monthly_aed": None,
+                    "cheques": {
+                        "count": None,
+                        "amount_per_cheque": None,
+                        "dates": []
+                    }
+                },
+                "deposit": {
+                    "refundable_aed": None,
+                    "security_deposit": None
+                },
+                "furnishing": {
+                    "status": None,
+                    "inventory_present": None
+                },
+                "responsibilities": {
+                    "service_charges": None,
+                    "dewa": None,
+                    "chiller": None,
+                    "ejari_registration": None,
+                    "maintenance_major": None,
+                    "maintenance_minor": None,
+                    "maintenance_minor_cap": None
+                },
+                "terms": {
+                    "pets_allowed": None,
+                    "subletting_allowed": None,
+                    "early_termination_penalty": None,
+                    "renewal_notice_days": None,
+                    "governing_law": None
+                },
+                "identifiers": {
+                    "ejari_number": None,
+                    "dewa_premise_no": None,
+                    "plot_no": None
+                },
+                "parsed_at": datetime.now().isoformat(),
+                "ai_model": "fallback",
+                "confidence": "low",
+                "rental_events": [],
+                "completeness_analysis": {
+                    "completeness_score": 0,
+                    "quality_status": "incomplete",
+                    "missing_critical": ["all_fields"],
+                    "missing_important": [],
+                    "needs_confirmation": [],
+                    "actionable_gaps": [],
+                    "validation_notes": ["Fallback parsing used - limited data extracted"]
+                }
+            }
+            
+            print("✅ Fallback parsing completed")
+            return contract_data
+            
+        except Exception as e:
+            print(f"Error in fallback parsing: {e}")
+            return {
+                "error": str(e), 
+                "parsed_at": datetime.now().isoformat(),
+                "rental_events": [],
+                "completeness_analysis": {
+                    "completeness_score": 0,
+                    "quality_status": "error",
+                    "missing_critical": ["all_fields"],
+                    "missing_important": [],
+                    "needs_confirmation": [],
+                    "actionable_gaps": [],
+                    "validation_notes": [f"Error in parsing: {str(e)}"]
+                }
+            }
 
 # Initialize services
 colab_client = ColabOCRClient(COLAB_URL)
@@ -195,12 +562,8 @@ async def root():
                 background: white;
                 box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             }
-            .event.payment { border-left-color: #4CAF50; }
-            .event.renewal { border-left-color: #FF9800; }
-            .event.maintenance { border-left-color: #2196F3; }
-            .event.deposit { border-left-color: #9C27B0; }
-            .event.inventory { border-left-color: #607D8B; }
-            .event.renewal_window_start { border-left-color: #FF5722; }
+            .event.payment_due { border-left-color: #4CAF50; }
+            .event.renewal_window_start { border-left-color: #FF9800; }
             .event.renewal_window_mid { border-left-color: #FF9800; }
             .event.renewal_deadline { border-left-color: #F44336; }
             .event.notice_deadline { border-left-color: #E91E63; }
@@ -617,7 +980,7 @@ async def analyze_contract(file: UploadFile = File(...)):
             print("🧠 Step 2: Comprehensive AI analysis with OpenAI API...")
             analysis_result = contract_intelligence.parse_contract(ocr_result['text'])
             
-            print(f"✅ AI analysis completed - Generated {len(analysis_result.get('rental_events', []))} events, Completeness: {analysis_result.get('completeness_analysis', {}).get('completeness_percentage', 'N/A')}%")
+            print(f"✅ AI analysis completed - Generated {len(analysis_result.get('rental_events', []))} events, Completeness: {analysis_result.get('completeness_analysis', {}).get('completeness_score', 'N/A')}%")
             
             return JSONResponse(content=analysis_result)
             
