@@ -13,8 +13,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import our modular components
-from .colab_client import ColabOCRClient
-from .contract_intelligence import ContractIntelligence
+from colab_client import ColabOCRClient
+from contract_intelligence import ContractIntelligence
 
 # Initialize FastAPI app
 app = FastAPI(
