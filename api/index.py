@@ -253,5 +253,7 @@ async def health_check():
             content={"status": "unhealthy", "error": str(e)}
         )
 
-# For Vercel
-handler = app
+# For Vercel - app is the main instance
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
