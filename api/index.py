@@ -530,11 +530,12 @@ async def root():
                     
                     if (response.ok) {
                         const result = await response.json();
-                        statusMessage.innerHTML = '<div class="success">✅ Analysis complete!</div>';
+                        statusMessage.innerHTML = '<div class="success">✅ AI analysis completed successfully!</div>';
                         resultsSection.style.display = 'block';
                         displayResults(result);
                     } else {
-                        statusMessage.innerHTML = `<div class="error">❌ Analysis failed: ${response.statusText}</div>`;
+                        const error = await response.json();
+                        statusMessage.innerHTML = `<div class="error">❌ Error: ${error.detail}</div>`;
                     }
                 } catch (error) {
                     statusMessage.innerHTML = `<div class="error">❌ Connection error: ${error.message}</div>`;
@@ -748,11 +749,13 @@ async def root():
                             </div>
                             
                             ${event.automated_actions && event.automated_actions.length > 0 ? `
-                                <div class="automated-actions">
-                                    <strong>🤖 Automated Actions (Future Features):</strong>
-                                    <div class="action-tags">
+                                <div class="automated-actions" style="margin-top: 15px; padding: 12px; background: #e9ecef; border-radius: 6px; border-left: 3px solid #6c757d;">
+                                    <h5 style="margin: 0 0 8px 0; color: #495057; font-size: 0.9em;">🤖 Automated Actions (Future Features):</h5>
+                                    <div class="action-tags" style="display: flex; flex-wrap: wrap; gap: 6px;">
                                         ${event.automated_actions.map(action => `
-                                            <span class="action-tag">${action}</span>
+                                            <span class="action-tag" style="background: #f8f9fa; color: #495057; padding: 4px 10px; border-radius: 15px; font-size: 0.8em; border: 1px dashed #6c757d;">
+                                                ${action}
+                                            </span>
                                         `).join('')}
                                     </div>
                                 </div>
@@ -774,21 +777,36 @@ async def root():
                         </div>
                     `;
                 }
+                
+                // Display raw text (OCR output)
+                const rawTextOutput = document.getElementById('rawTextOutput');
+                rawTextOutput.innerHTML = `
+                    <div class="raw-text-section" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+                        <h4>📄 OCR Extracted Text</h4>
+                        <div class="text-output" style="background: white; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6; font-family: monospace; font-size: 0.9em; line-height: 1.4; max-height: 300px; overflow-y: auto; white-space: pre-wrap;">${result.ocr_result?.raw_text || 'No text extracted'}</div>
+                    </div>
+                `;
             }
             
             function getEventColor(eventType) {
                 const colors = {
+                    'rent_payment_reminder': '#dc3545',
                     'rent_payment_due': '#dc3545',
-                    'renewal_window_start': '#fd7e14',
-                    'renewal_window_mid': '#ffc107',
+                    'renewal_window_start': '#ffc107',
+                    'renewal_window_mid': '#fd7e14',
                     'renewal_deadline': '#dc3545',
+                    'notice_deadline': '#dc3545',
                     'move_out_checklist': '#17a2b8',
                     'deposit_return_followup': '#6c757d',
+                    'deposit_return_reminder': '#6c757d',
                     'inventory_signoff': '#28a745',
-                    'maintenance_reminder': '#6f42c1',
-                    'compliance_alert': '#dc3545'
+                    'maintenance_reminder': '#17a2b8',
+                    'compliance_alert': '#e83e8c',
+                    'pest_control_reminder': '#20c997',
+                    'move_out_utilities': '#6f42c1',
+                    'default': '#6c757d'
                 };
-                return colors[eventType] || '#6c757d';
+                return colors[eventType] || colors.default;
             }
         </script>
     </body>
@@ -819,7 +837,15 @@ async def analyze_contract(file: UploadFile = File(...)):
             # Step 2: AI Analysis
             analysis_result = analyze_contract_ai(ocr_result['raw_text'])
             
-            return JSONResponse(content=analysis_result)
+            # Include OCR result in response (like local version)
+            return JSONResponse(content={
+                "status": "success",
+                "ocr_result": ocr_result,
+                "contract_data": analysis_result.get("contract_data", {}),
+                "rental_events": analysis_result.get("rental_events", []),
+                "completeness_analysis": analysis_result.get("completeness_analysis", {}),
+                "analysis_time": datetime.now().isoformat()
+            })
             
         finally:
             # Clean up temporary file
