@@ -225,7 +225,7 @@ async def root():
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Contract Intelligence Agent</title>
+    <title>Contract Intelligence Agent - Debug v321d13e</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
         .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
@@ -279,6 +279,12 @@ async def root():
 
                 const result = await response.json();
                 
+                // Debug: Log the result structure
+                console.log('🔍 Full result:', result);
+                console.log('🔍 Contract data:', result.contract_data);
+                console.log('🔍 Rental events:', result.rental_events);
+                console.log('🔍 Completeness analysis:', result.completeness_analysis);
+                
                 document.getElementById('status').textContent = 'Analysis complete!';
                 document.getElementById('content').innerHTML = formatResults(result);
                 
@@ -289,6 +295,15 @@ async def root():
 
         function formatResults(result) {
             let html = '';
+            
+            // Debug: Show raw result structure
+            html += '<div class="metric" style="background: #f0f0f0; border-left: 4px solid #ff6b6b;">';
+            html += '<h4>🔍 Debug Info</h4>';
+            html += `<strong>Result keys:</strong> ${Object.keys(result).join(', ')}<br>`;
+            if (result.contract_data) {
+                html += `<strong>Contract data keys:</strong> ${Object.keys(result.contract_data).join(', ')}<br>`;
+            }
+            html += '</div>';
             
             if (result.contract_data) {
                 html += '<div class="metric">';
