@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Contract Intelligence Agent - Single File Vercel Solution
+Contract Intelligence Agent - Vercel Compatible Version
 AI-powered contract analysis with OCR and automated event generation
 """
 
@@ -9,26 +9,13 @@ import json
 import tempfile
 import requests
 from datetime import datetime
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from flask import Flask, request, jsonify, render_template_string
+from flask_cors import CORS
 import openai
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Contract Intelligence Agent",
-    description="AI-powered rental contract analysis with OCR and automated event generation",
-    version="1.0.0"
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Initialize Flask app
+app = Flask(__name__)
+CORS(app)
 
 # Configuration
 COLAB_URL = os.getenv('COLAB_OCR_URL', 'https://snaillike-russel-snodly.ngrok-free.dev')
@@ -40,7 +27,7 @@ class ColabOCRClient:
     def __init__(self, colab_url: str):
         self.colab_url = colab_url.rstrip('/')
     
-    async def health_check(self) -> str:
+    def health_check(self) -> str:
         """Check if Colab OCR API is healthy"""
         try:
             response = requests.get(f"{self.colab_url}/health", timeout=10)
@@ -72,7 +59,7 @@ class ContractIntelligence:
     
     def __init__(self):
         openai.api_key = OPENAI_API_KEY
-        self.model = "gpt-3.5-turbo"
+        self.model = "gpt-4o-mini"
     
     def parse_contract(self, raw_text: str) -> dict:
         """Parse contract text using OpenAI API"""
@@ -225,8 +212,8 @@ IMPORTANT:
 colab_client = ColabOCRClient(COLAB_URL)
 contract_intelligence = ContractIntelligence()
 
-@app.get("/")
-async def root():
+@app.route('/')
+def root():
     """Main web interface"""
     html_content = """
 <!DOCTYPE html>
@@ -409,57 +396,56 @@ async def root():
 </body>
 </html>
     """
-    return HTMLResponse(content=html_content)
+    return html_content
 
-@app.post("/api/analyze")
-async def analyze_contract(file: UploadFile = File(...)):
+@app.route('/api/analyze', methods=['POST'])
+def analyze_contract():
     """Analyze uploaded contract"""
     try:
+        if 'file' not in request.files:
+            return jsonify({"detail": "No file uploaded"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"detail": "No file selected"}), 400
+        
         # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-            content = await file.read()
-            temp_file.write(content)
-            temp_file_path = temp_file.name
+        temp_path = f"/tmp/{file.filename}"
+        file.save(temp_path)
         
         try:
             # Step 1: OCR Processing
-            ocr_result = colab_client.process_contract(temp_file_path)
+            ocr_result = colab_client.process_contract(temp_path)
             
             if not ocr_result or not ocr_result.get('text'):
-                return JSONResponse(
-                    status_code=400,
-                    content={"detail": "OCR processing failed - no text extracted"}
-                )
+                return jsonify({"detail": "OCR processing failed - no text extracted"}), 400
             
             # Step 2: AI Analysis
             analysis_result = contract_intelligence.parse_contract(ocr_result['text'])
             
-            return JSONResponse(content=analysis_result)
+            return jsonify(analysis_result)
             
         finally:
             # Clean up temporary file
             try:
-                os.unlink(temp_file_path)
+                os.unlink(temp_path)
             except:
                 pass
                 
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"detail": f"Analysis failed: {str(e)}"}
-        )
+        return jsonify({"detail": f"Analysis failed: {str(e)}"}), 500
 
-@app.get("/api/health")
-async def health_check():
+@app.route('/api/health')
+def health_check():
     """Health check endpoint"""
     try:
         # Check Colab API
-        colab_status = await colab_client.health_check()
+        colab_status = colab_client.health_check()
         
         # Check OpenAI API
         openai_status = "✅ OpenAI API key present" if OPENAI_API_KEY else "❌ OpenAI API key missing"
         
-        return JSONResponse(content={
+        return jsonify({
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
             "services": {
@@ -468,10 +454,7 @@ async def health_check():
             }
         })
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "unhealthy", "error": str(e)}
-        )
+        return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
 # For Vercel
 handler = app
