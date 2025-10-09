@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 """
-Contract Intelligence Agent - Vercel Serverless
+Contract Intelligence Agent - Single File Vercel Solution
 AI-powered contract analysis with OCR and automated event generation
 """
 
 import os
 import json
 import tempfile
+import requests
 from datetime import datetime
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
-# Import our modular components
-from colab_client import ColabOCRClient
-from contract_intelligence import ContractIntelligence
+import openai
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -36,6 +34,193 @@ app.add_middleware(
 COLAB_URL = os.getenv('COLAB_OCR_URL', 'https://snaillike-russel-snodly.ngrok-free.dev')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
+class ColabOCRClient:
+    """Client for Colab OCR API"""
+    
+    def __init__(self, colab_url: str):
+        self.colab_url = colab_url.rstrip('/')
+    
+    async def health_check(self) -> str:
+        """Check if Colab OCR API is healthy"""
+        try:
+            response = requests.get(f"{self.colab_url}/health", timeout=10)
+            if response.status_code == 200:
+                return "✅ Colab API is healthy"
+            else:
+                return f"❌ Colab API returned {response.status_code}"
+        except Exception as e:
+            return f"❌ Colab API error: {str(e)}"
+    
+    def process_contract(self, file_path: str) -> dict:
+        """Process contract file with Colab OCR"""
+        try:
+            with open(file_path, 'rb') as f:
+                files = {'file': f}
+                response = requests.post(f"{self.colab_url}/ocr", files=files, timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result
+            else:
+                return {"text": "", "error": f"HTTP {response.status_code}"}
+                
+        except Exception as e:
+            return {"text": "", "error": str(e)}
+
+class ContractIntelligence:
+    """AI-powered contract analysis"""
+    
+    def __init__(self):
+        self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        self.model = "gpt-4o-mini"
+    
+    def parse_contract(self, raw_text: str) -> dict:
+        """Parse contract text using OpenAI API"""
+        
+        try:
+            prompt = f"""
+You are an expert contract analyst specializing in Dubai rental agreements. 
+Analyze the following contract text and provide a comprehensive analysis in JSON format.
+
+Contract Text:
+{raw_text}
+
+Return ONLY a valid JSON object with the following structure:
+{{
+    "contract_data": {{
+        "property": {{
+            "building": "Building name",
+            "unit": "Unit number", 
+            "location": "Full location",
+            "size_sqm": 85.42,
+            "type": "Property type"
+        }},
+        "parties": {{
+            "landlord": {{
+                "name": "Full landlord name",
+                "passport_no": "Passport number",
+                "phone_primary": "Primary phone",
+                "email": "Email address"
+            }},
+            "tenant": {{
+                "name": "Full tenant name",
+                "passport_no": "Passport number", 
+                "phone_primary": "Primary phone",
+                "email": "Email address"
+            }}
+        }},
+        "lease": {{
+            "start_date": "2021-07-20",
+            "end_date": "2022-07-19",
+            "duration_months": 12
+        }},
+        "rent": {{
+            "annual_aed": 48000.00,
+            "monthly_aed": 4000.00,
+            "cheques": {{
+                "count": 4,
+                "amounts": [12000.00, 12000.00, 12000.00, 12000.00]
+            }}
+        }},
+        "deposit": {{
+            "refundable_aed": 4000.00
+        }},
+        "furnishing": {{
+            "status": "Fully furnished"
+        }}
+    }},
+    "rental_events": [
+        {{
+            "event_type": "rent_payment",
+            "title": "Rent Payment Due",
+            "description": "Monthly rent payment",
+            "due_date": "2021-08-20",
+            "priority": "high",
+            "automated_actions": [
+                "📅 Add to Calendar",
+                "📧 Send Reminder"
+            ]
+        }}
+    ],
+    "completeness_analysis": {{
+        "completeness_score": 85,
+        "quality_status": "good",
+        "missing_critical": ["ejari_number"],
+        "actionable_gaps": [
+            {{
+                "type": "upload",
+                "field": "ejari_number",
+                "label": "Upload Ejari PDF",
+                "description": "Ejari certificate required",
+                "priority": "critical",
+                "automated_action": "📄 Request Document Upload"
+            }}
+        ]
+    }}
+}}
+
+IMPORTANT: 
+- Extract ONLY information explicitly stated in the contract
+- Use null for missing information, don't make assumptions
+- Format dates as YYYY-MM-DD
+- Format currency as numbers (e.g., 48000.00)
+- Return valid JSON only, no markdown formatting
+"""
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=2000,
+                temperature=0.1
+            )
+            
+            ai_response = response.choices[0].message.content.strip()
+            
+            # Clean up response if it has markdown formatting
+            if ai_response.startswith('```json'):
+                ai_response = ai_response.replace('```json', '').replace('```', '').strip()
+            elif ai_response.startswith('```'):
+                ai_response = ai_response.replace('```', '').strip()
+            
+            # Parse JSON response
+            analysis_result = json.loads(ai_response)
+            
+            # Extract contract data and add metadata
+            contract_data = analysis_result.get("contract_data", {})
+            contract_data["parsed_at"] = datetime.now().isoformat()
+            contract_data["ai_model"] = self.model
+            contract_data["confidence"] = "high"
+            
+            # Add events and completeness analysis to the result
+            contract_data["rental_events"] = analysis_result.get("rental_events", [])
+            contract_data["completeness_analysis"] = analysis_result.get("completeness_analysis", {})
+            
+            return contract_data
+            
+        except Exception as e:
+            return self._fallback_parsing(raw_text)
+    
+    def _fallback_parsing(self, raw_text: str) -> dict:
+        """Fallback parsing if AI fails"""
+        return {
+            "contract_data": {
+                "property": {"building": "Unknown", "unit": "Unknown", "location": "Unknown"},
+                "parties": {"landlord": {"name": "Unknown"}, "tenant": {"name": "Unknown"}},
+                "lease": {"start_date": "Unknown", "end_date": "Unknown"},
+                "rent": {"annual_aed": 0, "monthly_aed": 0},
+                "parsed_at": datetime.now().isoformat(),
+                "ai_model": "fallback",
+                "confidence": "low"
+            },
+            "rental_events": [],
+            "completeness_analysis": {
+                "completeness_score": 0,
+                "quality_status": "failed",
+                "missing_critical": ["all_fields"],
+                "actionable_gaps": []
+            }
+        }
+
 # Initialize components
 colab_client = ColabOCRClient(COLAB_URL)
 contract_intelligence = ContractIntelligence()
@@ -56,12 +241,9 @@ async def root():
         .upload-section:hover { border-color: #007bff; }
         .results-section { display: none; }
         .metric-card { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
-        .text-output { background: #f8f9fa; padding: 20px; border-radius: 5px; max-height: 400px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; }
         .contract-data { background: #e8f5e8; padding: 20px; border-radius: 5px; margin: 20px 0; }
         .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
         .btn:hover { background: #0056b3; }
-        .btn-success { background: #28a745; }
-        .btn-warning { background: #ffc107; color: black; }
         .progress-bar { width: 100%; height: 20px; background: #e9ecef; border-radius: 10px; overflow: hidden; margin: 10px 0; }
         .progress-fill { height: 100%; background: #007bff; width: 0%; transition: width 0.3s ease; }
         .event-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 10px 0; }
@@ -71,7 +253,6 @@ async def root():
         .completeness-section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
         .gap-item { background: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px 0; }
         .gap-critical { border-left: 4px solid #dc3545; }
-        .gap-important { border-left: 4px solid #ffc107; }
     </style>
 </head>
 <body>
