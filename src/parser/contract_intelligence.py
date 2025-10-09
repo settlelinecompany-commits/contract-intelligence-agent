@@ -23,10 +23,10 @@ class ContractIntelligence:
             prompt = f"""
 You are an expert contract analyst specializing in Dubai rental agreements. 
 Analyze the following contract text and provide a comprehensive analysis in JSON format.
-
-Contract Text:
-{raw_text}
-
+        
+        Contract Text:
+        {raw_text}
+        
 Return ONLY a valid JSON object with the following structure:
             {{
                 "contract_data": {{
@@ -362,8 +362,8 @@ Return ONLY a valid JSON object with the following structure:
                 
                 # Extract contract data and add metadata
                 contract_data = analysis_result.get("contract_data", {})
-                contract_data["parsed_at"] = datetime.now().isoformat()
-                contract_data["ai_model"] = self.model
+            contract_data["parsed_at"] = datetime.now().isoformat()
+            contract_data["ai_model"] = self.model
                 contract_data["confidence"] = "high"
                 
                 # Add events and completeness analysis to the result
