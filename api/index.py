@@ -356,6 +356,13 @@ async def analyze_contract(file: UploadFile = File(...)):
             # Step 2: AI Analysis
             analysis_result = analyze_contract_ai(ocr_result['text'])
             
+            # Debug: Log the structure being returned
+            print(f"🔍 DEBUG: Analysis result keys: {list(analysis_result.keys())}")
+            if 'contract_data' in analysis_result:
+                print(f"🔍 DEBUG: Contract data keys: {list(analysis_result['contract_data'].keys())}")
+            if 'rental_events' in analysis_result:
+                print(f"🔍 DEBUG: Rental events count: {len(analysis_result['rental_events'])}")
+            
             return JSONResponse(content=analysis_result)
             
         finally:
@@ -370,6 +377,16 @@ async def analyze_contract(file: UploadFile = File(...)):
             status_code=500,
             content={"detail": f"Analysis failed: {str(e)}"}
         )
+
+@app.get("/api/test-ai")
+async def test_ai():
+    """Test AI function with sample text"""
+    sample_text = "This is a rental contract for Resortz Residence Block 2, Apt 113. Annual rent is AED 48,000. Tenant is John Doe."
+    result = analyze_contract_ai(sample_text)
+    return JSONResponse(content={
+        "test_result": result,
+        "keys": list(result.keys()) if isinstance(result, dict) else "Not a dict"
+    })
 
 @app.get("/api/health")
 async def health_check():
