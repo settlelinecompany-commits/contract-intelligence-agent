@@ -203,11 +203,15 @@ IMPORTANT INSTRUCTIONS:
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=3000,
+            max_tokens=4000,
             temperature=0.1
         )
         
         result = response.choices[0].message.content.strip()
+        
+        # Debug: Log the raw AI response
+        print(f"🔍 DEBUG: Raw AI response length: {len(result)}")
+        print(f"🔍 DEBUG: Raw AI response preview: {result[:500]}...")
         
         # Clean JSON response
         if result.startswith('```json'):
@@ -215,7 +219,10 @@ IMPORTANT INSTRUCTIONS:
         elif result.startswith('```'):
             result = result.replace('```', '').strip()
         
-        return json.loads(result)
+        parsed_result = json.loads(result)
+        print(f"🔍 DEBUG: Parsed result keys: {list(parsed_result.keys())}")
+        
+        return parsed_result
         
     except Exception as e:
         return {
