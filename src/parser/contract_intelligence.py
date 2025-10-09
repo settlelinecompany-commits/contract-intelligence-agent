@@ -21,13 +21,13 @@ class ContractIntelligence:
         try:
             # Create a comprehensive prompt for contract parsing, event generation, and completeness validation
             prompt = f"""
-            You are an expert contract analyst specializing in Dubai rental agreements. 
-            Analyze the following contract text and provide a comprehensive analysis in JSON format.
-        
-        Contract Text:
-        {raw_text}
-        
-            Return ONLY a valid JSON object with the following structure:
+You are an expert contract analyst specializing in Dubai rental agreements. 
+Analyze the following contract text and provide a comprehensive analysis in JSON format.
+
+Contract Text:
+{raw_text}
+
+Return ONLY a valid JSON object with the following structure:
             {{
                 "contract_data": {{
                     "property": {{
