@@ -25,16 +25,27 @@ openai.api_key = OPENAI_API_KEY
 def process_ocr(file_path: str) -> dict:
     """Process file with Colab OCR"""
     try:
+        print(f"🔍 DEBUG: Attempting OCR with URL: {COLAB_URL}/ocr")
+        
         with open(file_path, 'rb') as f:
             files = {'file': f}
             response = requests.post(f"{COLAB_URL}/ocr", files=files, timeout=60)
         
+        print(f"🔍 DEBUG: OCR response status: {response.status_code}")
+        print(f"🔍 DEBUG: OCR response content: {response.text[:200]}...")
+        
         if response.status_code == 200:
-            return response.json()
+            result = response.json()
+            print(f"🔍 DEBUG: OCR success, text length: {len(result.get('text', ''))}")
+            return result
         else:
-            return {"text": "", "error": f"HTTP {response.status_code}"}
+            error_msg = f"HTTP {response.status_code}: {response.text}"
+            print(f"🔍 DEBUG: OCR failed: {error_msg}")
+            return {"text": "", "error": error_msg}
     except Exception as e:
-        return {"text": "", "error": str(e)}
+        error_msg = f"OCR Exception: {str(e)}"
+        print(f"🔍 DEBUG: OCR exception: {error_msg}")
+        return {"text": "", "error": error_msg}
 
 def analyze_contract_ai(text: str) -> dict:
     """Analyze contract with OpenAI"""
