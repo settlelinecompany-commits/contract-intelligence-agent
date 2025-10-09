@@ -40,24 +40,158 @@ def analyze_contract_ai(text: str) -> dict:
     """Analyze contract with OpenAI"""
     try:
         prompt = f"""
-Analyze this rental contract and return JSON with:
-- property details (building, unit, location)
-- parties (landlord, tenant names)
-- lease terms (start_date, end_date)
-- rent details (annual_aed, monthly_aed)
-- deposit amount
-- rental events (payment dates, renewal reminders)
-- completeness analysis (missing fields)
+You are an expert contract analyst specializing in Dubai rental agreements. 
+Analyze the following contract text and provide a comprehensive analysis in JSON format.
 
-Contract text: {text}
+Contract Text:
+{text}
 
-Return valid JSON only.
+Return ONLY a valid JSON object with the following structure:
+{{
+    "contract_data": {{
+        "property": {{
+            "building": "Building name (e.g., 'Resortz Residence Block 2')",
+            "unit": "Unit number (e.g., 'Apt 113')",
+            "location": "Full location (e.g., 'Arjan, Al Barsha South Third, Dubai')",
+            "size_sqm": 85.42,
+            "type": "Property type (Residential, Commercial, etc.)"
+        }},
+        "parties": {{
+            "landlord": {{
+                "name": "Full landlord name",
+                "passport_no": "Passport number if mentioned",
+                "phone_primary": "Primary phone number",
+                "phone_alt": "Alternative phone number if mentioned",
+                "email": "Email address if mentioned"
+            }},
+            "tenant": {{
+                "name": "Full tenant name",
+                "passport_no": "Passport number if mentioned",
+                "phone_primary": "Primary phone number if mentioned",
+                "email": "Email address if mentioned"
+            }},
+            "agent": {{
+                "name": "Real estate agent or company name",
+                "email": "Agent email if mentioned",
+                "phone": "Agent phone if mentioned"
+            }}
+        }},
+        "identifiers": {{
+            "dewa_premise_no": "DEWA premise number if mentioned",
+            "plot_no": "Plot number if mentioned",
+            "ejari_number": "Ejari registration number if mentioned"
+        }},
+        "lease": {{
+            "start_date": "2021-07-20",
+            "end_date": "2022-07-19",
+            "duration_months": 12
+        }},
+        "rent": {{
+            "annual_aed": 48000.00,
+            "monthly_aed": 4000.00,
+            "cheques": {{
+                "count": 4,
+                "amounts": [12000.00, 12000.00, 12000.00, 12000.00],
+                "dates": ["2021-07-20", "2021-10-20", "2022-01-20", "2022-04-20"]
+            }}
+        }},
+        "deposit": {{
+            "refundable_aed": 4000.00,
+            "type": "Security deposit"
+        }},
+        "furnishing": {{
+            "status": "Fully furnished/Unfurnished/Partially furnished",
+            "inventory_present": true
+        }},
+        "responsibilities": {{
+            "service_charges": {{
+                "party": "Landlord/Tenant",
+                "amount": "Amount if specified"
+            }},
+            "dewa": {{
+                "party": "Landlord/Tenant"
+            }},
+            "chiller": {{
+                "party": "Landlord/Tenant",
+                "amount": "Amount if specified"
+            }},
+            "maintenance": {{
+                "major_party": "Landlord/Tenant",
+                "minor_party": "Landlord/Tenant",
+                "minor_cap_aed": 500.00
+            }},
+            "ejari_registration": {{
+                "party": "Landlord/Tenant",
+                "conflict_notes": "Any conflicting clauses"
+            }}
+        }},
+        "terms": {{
+            "pets_allowed": false,
+            "subletting_allowed": false,
+            "early_termination": {{
+                "notice_days": 30,
+                "penalty": "Penalty description"
+            }},
+            "renewal": {{
+                "notice_days": 90,
+                "broker_fee": "Broker fee if mentioned"
+            }}
+        }}
+    }},
+    "rental_events": [
+        {{
+            "event_type": "payment_due",
+            "title": "Rent Payment Due",
+            "description": "Monthly rent payment due",
+            "due_date": "2021-08-20",
+            "priority": "high",
+            "automated_action": "Send WhatsApp Reminder"
+        }},
+        {{
+            "event_type": "renewal_window_start",
+            "title": "Renewal Window Opens",
+            "description": "90-day renewal notice period begins",
+            "due_date": "2022-04-20",
+            "priority": "medium",
+            "automated_action": "Add to Calendar"
+        }}
+    ],
+    "completeness_analysis": {{
+        "completeness_score": 85,
+        "missing_critical": ["ejari_number", "tenant_phone"],
+        "missing_important": ["cheque_dates", "inventory_list"],
+        "needs_confirmation": ["ejari_registration_party"],
+        "suggested_improvements": [
+            "Upload Ejari certificate",
+            "Add tenant contact details"
+        ],
+        "actionable_gaps": [
+            {{
+                "type": "missing_document",
+                "field": "ejari_certificate",
+                "label": "Ejari Certificate",
+                "description": "Ejari registration certificate not found",
+                "priority": "high",
+                "status": "missing",
+                "automated_action": "Request Upload"
+            }}
+        ]
+    }}
+}}
+
+IMPORTANT INSTRUCTIONS:
+1. Extract ONLY information explicitly stated in the contract text
+2. Do NOT make assumptions or derive values not clearly mentioned
+3. Use null for missing information, not placeholder text
+4. Format dates as YYYY-MM-DD
+5. Format currency amounts as numbers (e.g., 48000.00)
+6. Return ONLY the JSON object, no additional text or explanations
 """
 
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1500,
+            max_tokens=3000,
             temperature=0.1
         )
         
@@ -74,9 +208,14 @@ Return valid JSON only.
     except Exception as e:
         return {
             "error": str(e),
-            "contract_data": {"property": {"building": "Error", "unit": "Error"}},
+            "contract_data": {
+                "property": {"building": "Error", "unit": "Error", "location": "Error"},
+                "parties": {"landlord": {"name": "Error"}, "tenant": {"name": "Error"}},
+                "rent": {"annual_aed": 0, "monthly_aed": 0},
+                "deposit": {"refundable_aed": 0}
+            },
             "rental_events": [],
-            "completeness_analysis": {"completeness_score": 0}
+            "completeness_analysis": {"completeness_score": 0, "missing_critical": [], "actionable_gaps": []}
         }
 
 @app.get("/")
