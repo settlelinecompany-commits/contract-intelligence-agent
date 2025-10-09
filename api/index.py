@@ -71,8 +71,8 @@ class ContractIntelligence:
     """AI-powered contract analysis"""
     
     def __init__(self):
-        self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        self.model = "gpt-4o-mini"
+        openai.api_key = OPENAI_API_KEY
+        self.model = "gpt-3.5-turbo"
     
     def parse_contract(self, raw_text: str) -> dict:
         """Parse contract text using OpenAI API"""
@@ -167,7 +167,7 @@ IMPORTANT:
 - Return valid JSON only, no markdown formatting
 """
 
-            response = self.client.chat.completions.create(
+            response = openai.ChatCompletion.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=2000,
