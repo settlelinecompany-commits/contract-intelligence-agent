@@ -36,16 +36,17 @@ def process_ocr(file_path: str) -> dict:
         
         if response.status_code == 200:
             result = response.json()
-            print(f"🔍 DEBUG: OCR success, text length: {len(result.get('text', ''))}")
+            text_length = len(result.get('raw_text', ''))
+            print(f"🔍 DEBUG: OCR success, text length: {text_length}")
             return result
         else:
             error_msg = f"HTTP {response.status_code}: {response.text}"
             print(f"🔍 DEBUG: OCR failed: {error_msg}")
-            return {"text": "", "error": error_msg}
+            return {"raw_text": "", "error": error_msg}
     except Exception as e:
         error_msg = f"OCR Exception: {str(e)}"
         print(f"🔍 DEBUG: OCR exception: {error_msg}")
-        return {"text": "", "error": error_msg}
+        return {"raw_text": "", "error": error_msg}
 
 def analyze_contract_ai(text: str) -> dict:
     """Analyze contract with OpenAI"""
@@ -373,14 +374,14 @@ async def analyze_contract(file: UploadFile = File(...)):
             # Step 1: OCR Processing
             ocr_result = process_ocr(temp_file_path)
             
-            if not ocr_result or not ocr_result.get('text'):
+            if not ocr_result or not ocr_result.get('raw_text'):
                 return JSONResponse(
                     status_code=400,
                     content={"detail": "OCR processing failed"}
                 )
             
             # Step 2: AI Analysis
-            analysis_result = analyze_contract_ai(ocr_result['text'])
+            analysis_result = analyze_contract_ai(ocr_result['raw_text'])
             
             # Debug: Log the structure being returned
             print(f"🔍 DEBUG: Analysis result keys: {list(analysis_result.keys())}")
