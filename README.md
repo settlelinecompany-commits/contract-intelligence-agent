@@ -1,14 +1,14 @@
-# Contract Intelligence Agent
+# Contract Intelligence Backend
 
-AI-powered contract analysis system that extracts structured data from rental contracts, generates automated events, and provides completeness validation.
+AI-powered contract analysis backend that extracts structured data from rental contracts using GPU-accelerated OCR and AI processing.
 
 ## Features
 
-- **GPU-Accelerated OCR**: Uses Google Colab with Surya OCR for high-quality text extraction
-- **AI-Powered Analysis**: GPT-4o-mini for intelligent contract parsing and data extraction
-- **Automated Event Generation**: Creates rental events with automated action placeholders
-- **Completeness Validation**: Identifies missing information and actionable gaps
-- **Beautiful Web UI**: Clean, organized interface with visual elements
+- **GPU-Accelerated OCR**: Uses RunPod serverless with Surya OCR for high-quality text extraction
+- **AI-Powered Analysis**: GPT-4 for intelligent contract parsing and data extraction
+- **Colab Integration**: Optional Google Colab OCR processing
+- **Structured Data Extraction**: Converts contract text into organized JSON format
+- **RunPod Deployment**: Serverless GPU processing for scalable OCR
 
 ## Quick Start
 
@@ -16,7 +16,7 @@ AI-powered contract analysis system that extracts structured data from rental co
 
 - Python 3.8+
 - OpenAI API key
-- Access to Colab OCR API (shared ngrok URL from team member)
+- RunPod account (for serverless deployment)
 
 ### Installation
 
@@ -42,53 +42,97 @@ AI-powered contract analysis system that extracts structured data from rental co
    ```bash
    OPENAI_API_KEY=your_openai_api_key_here
    ```
-   
-   **Note:** Colab OCR URL is pre-configured in the code. No need to set `COLAB_OCR_URL` unless you want to use a different endpoint.
 
-5. **Colab OCR is pre-configured!**
-   
-   The system uses a shared Colab OCR endpoint that's already configured in the code. No additional setup needed!
-   
-   **If you want to use your own Colab:**
-   - Open `colab_ocr_processor.ipynb` in Google Colab
-   - Run all cells to start the OCR API server
-   - Set `COLAB_OCR_URL` in your `.env` file with your ngrok URL
+### Local Development
 
-6. **Run the application:**
+**Run the FastAPI server:**
+```bash
+python3 api/index.py
+```
+
+**Access the API:**
+- API documentation: `http://localhost:8000/docs`
+- Health check: `http://localhost:8000/health`
+
+### RunPod Deployment
+
+1. **Build Docker image:**
    ```bash
-   python3 contract_intelligence_agent.py
+   docker build -t contract-intelligence .
    ```
 
-7. **Access the web interface:**
-   Open your browser to `http://localhost:8002`
+2. **Deploy to RunPod:**
+   - Push image to RunPod registry
+   - Create serverless endpoint
+   - Configure environment variables
+
+3. **Test RunPod endpoint:**
+   ```bash
+   curl -X POST "https://api.runpod.ai/v2/YOUR_ENDPOINT_ID/runsync" \
+        -H "Authorization: Bearer YOUR_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{"input": {"pdf_data": "base64_encoded_pdf"}}'
+   ```
 
 ## Usage
 
-1. **Upload a rental contract PDF** using the web interface
-2. **View extracted contract data** organized by sections (Property, Parties, Financial, etc.)
-3. **Review generated events** with automated action placeholders
-4. **Check completeness analysis** for missing information and actionable gaps
+### API Endpoints
+
+- `POST /analyze` - Analyze uploaded contract PDF
+- `GET /health` - Health check
+- `GET /docs` - API documentation (Swagger UI)
+
+### Request Format
+
+```json
+{
+  "pdf_data": "base64_encoded_pdf_content"
+}
+```
+
+### Response Format
+
+```json
+{
+  "success": true,
+  "ocr_text": "extracted text from PDF",
+  "extracted_data": {
+    "property": {...},
+    "unit": {...},
+    "landlord": {...},
+    "tenant": {...},
+    "lease": {...},
+    "payments": [...],
+    "documents": {...},
+    "responsibilities": {...}
+  }
+}
+```
 
 ## Architecture
 
-- **Frontend**: FastAPI with HTML/JavaScript web interface
-- **OCR Processing**: Google Colab with Surya OCR (GPU-accelerated)
-- **AI Analysis**: OpenAI GPT-4o-mini for contract parsing
-- **Data Structure**: Structured JSON with property, parties, lease, and responsibilities
+- **Backend**: FastAPI with Python
+- **OCR Processing**: RunPod serverless with Surya OCR (GPU-accelerated)
+- **AI Analysis**: OpenAI GPT-4 for contract parsing
+- **Deployment**: Docker containers on RunPod
+- **Optional**: Google Colab integration for development
 
 ## File Structure
 
 ```
 contract-intelligence/
-├── contract_intelligence_agent.py    # Main FastAPI application
-├── colab_client.py                   # Colab OCR API client
-├── colab_ocr_processor.ipynb         # Google Colab OCR notebook
+├── api/
+│   └── index.py                    # FastAPI application
+├── rp_handler.py                   # RunPod serverless handler
+├── colab_client.py                 # Colab OCR API client
+├── colab_ocr_processor.ipynb       # Google Colab OCR notebook
 ├── src/
 │   └── parser/
-│       └── contract_intelligence.py  # GPT-powered contract parser
-├── requirements.txt                  # Python dependencies
-├── .env                             # Environment variables (create this)
-└── README.md                        # This file
+│       └── contract_intelligence.py # GPT-powered contract parser
+├── Dockerfile                      # Docker configuration
+├── requirements.txt                # Python dependencies
+├── .env                           # Environment variables (create this)
+└── README.md                      # This file
 ```
 
 ## Environment Variables
@@ -96,33 +140,70 @@ contract-intelligence/
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `OPENAI_API_KEY` | Your OpenAI API key | Yes |
-| `COLAB_OCR_URL` | ngrok URL from Colab OCR server | No (pre-configured) |
 
-## API Endpoints
+## Integration with Frontend
 
-- `GET /` - Web interface
-- `POST /analyze` - Analyze uploaded contract
-- `GET /health` - Health check
+This backend is designed to work with the `contract-dashboard` frontend:
 
-## Future Features (Visual Placeholders)
+1. **Frontend** uploads PDF to `/api/upload`
+2. **Frontend** calls RunPod OCR endpoint
+3. **Backend** processes OCR text with GPT-4
+4. **Frontend** stores structured data in Supabase
 
-The system shows visual placeholders for future automation features:
+## Development
 
-- **Automated Actions**: Calendar integration, WhatsApp reminders, document uploads
-- **Actionable Gaps**: Upload interfaces, contact forms, conflict resolution
-- **Smart Notifications**: Email/SMS reminders, deadline alerts
+### Local Testing
+
+```bash
+# Start FastAPI server
+python3 api/index.py
+
+# Test OCR processing
+python3 -c "
+import requests
+import base64
+
+# Read sample PDF
+with open('Tenancy_Contract.pdf', 'rb') as f:
+    pdf_data = base64.b64encode(f.read()).decode()
+
+# Test API
+response = requests.post('http://localhost:8000/analyze', 
+                       json={'pdf_data': pdf_data})
+print(response.json())
+"
+```
+
+### RunPod Testing
+
+```bash
+# Test RunPod endpoint
+python3 -c "
+import requests
+import base64
+
+# Read sample PDF
+with open('Tenancy_Contract.pdf', 'rb') as f:
+    pdf_data = base64.b64encode(f.read()).decode()
+
+# Test RunPod
+response = requests.post('https://api.runpod.ai/v2/YOUR_ENDPOINT_ID/runsync',
+                        headers={'Authorization': 'Bearer YOUR_API_KEY'},
+                        json={'input': {'pdf_data': pdf_data}})
+print(response.json())
+"
+```
 
 ## Troubleshooting
 
-1. **Colab OCR not working**: 
-   - If using shared setup: Ask team member to restart their Colab notebook
-   - If using your own: Ensure the Colab notebook is running and ngrok URL is correct
+1. **RunPod OCR errors**: Check endpoint configuration and API key
 2. **OpenAI API errors**: Check your API key and quota
-3. **Port already in use**: Kill existing processes or change the port in the code
+3. **Docker build issues**: Ensure all dependencies are in requirements.txt
+4. **Local server issues**: Check port availability and dependencies
 
 ## Contributing
 
-This is a prototype system for contract intelligence. The visual elements show planned features for discussion and development.
+This is the backend service for contract intelligence. The frontend dashboard is in a separate repository.
 
 ## License
 

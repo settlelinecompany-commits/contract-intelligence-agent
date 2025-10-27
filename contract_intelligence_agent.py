@@ -17,7 +17,8 @@ load_dotenv()
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from colab_client import ColabOCRClient
+# With this:
+from runpod_client import RunPodOCRClient
 from src.parser.contract_intelligence import ContractIntelligence
 from fastapi import FastAPI, File, UploadFile, Request
 from fastapi.responses import HTMLResponse
@@ -26,16 +27,18 @@ import uvicorn
 app = FastAPI(title="Contract Intelligence Agent")
 
 # Initialize components
-COLAB_URL = os.getenv('COLAB_OCR_URL', 'https://snaillike-russel-snodly.ngrok-free.dev')
-colab_client = None
+RUNPOD_ENDPOINT_ID = os.getenv('RUNPOD_ENDPOINT_ID', '7512k3bkbtr02j')
+RUNPOD_API_KEY = os.getenv('RUNPOD_API_KEY')
+runpod_client = None
 contract_parser = None
 
-def get_colab_client():
-    """Get or create Colab client"""
-    global colab_client
-    if colab_client is None:
-        colab_client = ColabOCRClient(COLAB_URL)
-    return colab_client
+# Replace the get_colab_client function:
+def get_runpod_client():
+    """Get or create RunPod client"""
+    global runpod_client
+    if runpod_client is None:
+        runpod_client = RunPodOCRClient(RUNPOD_ENDPOINT_ID, RUNPOD_API_KEY)
+    return runpod_client
 
 def get_contract_parser():
     """Get or create contract parser"""
@@ -582,7 +585,7 @@ async def analyze_contract(file: UploadFile = File(...)):
         
         # Step 1: OCR with Colab GPU
         print("🚀 Step 1: Processing with Colab GPU OCR...")
-        client = get_colab_client()
+        client = get_runpod_client()
         ocr_result = client.process_file(temp_path)
         
         if ocr_result.get('extraction_status') != 'success':
@@ -593,7 +596,7 @@ async def analyze_contract(file: UploadFile = File(...)):
         # Step 2: AI Contract Analysis (includes event generation and completeness validation)
         print("🧠 Step 2: Comprehensive AI analysis with OpenAI API...")
         parser = get_contract_parser()
-        contract_data = parser.parse_contract(ocr_result['raw_text'])
+        contract_data = parser.parse_contract(ocr_result['ocr_text'])
         
         if 'error' in contract_data:
             raise Exception(f"AI parsing failed: {contract_data['error']}")

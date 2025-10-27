@@ -28,7 +28,7 @@ ENV/
 env.bak/
 venv.bak/
 
-# Environment Variables
+# Environment variables
 .env
 .env.local
 .env.development.local
@@ -51,26 +51,23 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# Temporary files
-temp_*
-*.tmp
-*.temp
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
 # Logs
 *.log
 logs/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# FastAPI
-.pytest_cache/
-
-# Uploads
-uploads/
-temp_uploads/
-
-# Test files (keep examples in examples/ folder)
-*_test.pdf
-test_*.pdf
-sample_*.pdf
+# Temporary files
+*.tmp
+*.temp
