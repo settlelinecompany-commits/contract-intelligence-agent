@@ -39,35 +39,17 @@ def run_surya_ocr(images):
         pages.append("\n".join(lines))
     return "\n\n".join(pages)
 
-# BACKUP VERSION - Simple handler (working)
-# def handler(event):
-#     print(f"Worker Start")
-#     input = event['input']
-#     prompt = input.get('prompt')  
-#     seconds = input.get('seconds', 0)  
-#     print(f"Received prompt: {prompt}")
-#     print(f"Sleeping for {seconds} seconds...")
-#     time.sleep(seconds)  
-#     return prompt 
-
-# OCR VERSION - New handler with Surya OCR
 def handler(event):
     print(f"Worker Start")
     input = event['input']
     
-    # Get base64 PDF
     pdf_data = input.get('pdf_data')
     if pdf_data:
         try:
             print("Processing PDF with Surya OCR...")
-            # Decode base64 PDF
             pdf_bytes = base64.b64decode(pdf_data)
-            
-            # Convert PDF to images
             images = pdf_to_images(pdf_bytes)
             print(f"Converted PDF to {len(images)} images")
-            
-            # Run Surya OCR
             ocr_text = run_surya_ocr(images)
             print(f"OCR completed, extracted {len(ocr_text)} characters")
             
@@ -81,7 +63,6 @@ def handler(event):
             print(f"OCR Error: {str(e)}")
             return {"success": False, "error": str(e)}
     else:
-        # Fallback to simple prompt handling
         prompt = input.get('prompt')  
         seconds = input.get('seconds', 0)  
         print(f"Received prompt: {prompt}")
@@ -89,21 +70,12 @@ def handler(event):
         time.sleep(seconds)  
         return prompt 
 
-# Start the Serverless function when the script is run
 if __name__ == '__main__':
-    # For local testing, simulate the RunPod environment
     try:
-        # Try to run as RunPod serverless
         runpod.serverless.start({'handler': handler })
     except AttributeError:
-        # If runpod.serverless doesn't exist, test locally
         print("Testing locally (RunPod serverless not available)")
-        
-        # Load test input
         with open('test_input.json', 'r') as f:
             test_event = json.load(f)
-        
-        # Test the handler
         result = handler(test_event)
         print(f"Handler result: {result}")
-
