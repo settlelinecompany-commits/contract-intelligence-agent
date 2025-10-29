@@ -5,7 +5,7 @@ python-multipart==0.0.6
 
 # AI and OCR dependencies
 openai==0.28.1
-requests==2.28.2
+requests>=2.31.0
 
 # RunPod serverless handler
 runpod==1.0.0
