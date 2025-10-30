@@ -12,3 +12,8 @@ runpod==1.0.0
 
 # Additional utilities
 python-dotenv==1.0.0
+
+runpod==1.0.0
+
+# Additional utilities
+python-dotenv==1.0.0

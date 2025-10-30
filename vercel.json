@@ -4,9 +4,39 @@
     {
       "src": "api/index.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "api/ocr.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
+    {
+      "src": "/ocr",
+      "dest": "/api/ocr.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.py"
+    }
+  ]
+}
+
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "api/ocr.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/ocr",
+      "dest": "/api/ocr.py"
+    },
     {
       "src": "/(.*)",
       "dest": "/api/index.py"
